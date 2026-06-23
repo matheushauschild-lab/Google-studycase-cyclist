@@ -23,7 +23,7 @@ To handle a multi-million-row volume inefficient for spreadsheet software, data 
   * Formatted temporal attributes using string and date extraction functions (**`EXTRACT`** / **`CASE WHEN`**) to isolate specific months and days of the week.
 * **Data Cleaning & Constraints:** * Enforced **`WHERE`** clause filters to strip data anomalies, including negative trip durations and maintenance test rows.
   * Screened database integrity using **`IS NOT NULL`** operators to handle missing spatial coordinates and incomplete station rows.
-  * Streamlined the target scope by filtering the `rideable_type` strings to isolate active consumer variants (**Classic** and **Electric** models).
+  * **Handling Missing Spatial Data:** Applied the **`COALESCE`** function to intercept `NULL` values in the start and end station columns, dynamically swapping missing entries with a standard fallback string (`'Unknown'`) to preserve absolute trip volumes while preventing structural breaks in Tableau.
 
 ## 4. Analyze (SQL Data Exploration)
 Aggregated metrics were queried using advanced descriptive statistics to extract operational insights:
