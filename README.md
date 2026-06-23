@@ -4,7 +4,7 @@ Data analytics case study analyzing Cyclistic bike-share data (April 2025–Marc
 
 **Project Overview:** An end-to-end data analytics case study executing the data analysis lifecycle (Ask, Prepare, Process, Analyze, Share, Act) to isolate behavioral differences between annual members and casual riders. 
 
-* **Live Interactive Dashboard:** [PASTE YOUR TABLEAU PUBLIC LINK HERE]
+* **Live Interactive Dashboard:** [https://public.tableau.com/app/profile/matheus.hauschild/viz/Cyclist_DataGoogleCapstoneProject/OverviewKeyMetrics]
 * **Tools Used:** SQL (Google BigQuery / Data Schema Management), Tableau Public
 
 ---
