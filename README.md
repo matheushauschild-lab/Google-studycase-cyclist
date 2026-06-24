@@ -15,25 +15,33 @@ The business objective is to analyze historical trip data to identify how annual
 ## 2. Prepare (Data Sourcing)
 The analysis utilizes 12 months of historical trip data spanning from **April 2025 to March 2026**. The dataset tracks granular trip details including bike classifications, user categories, and anonymized start/end timestamps. 
 
-## 3. Process (Data Cleaning & Wrangle Pipelines)
-To handle a multi-million-row volume inefficient for spreadsheet software, data transformation was engineered using optimized SQL scripts to ensure rigorous data integrity:
-* **Data Aggregation:** Utilized **`UNION ALL`** statements to vertically stack and consolidate 12 distinct monthly CSV tables into a single, unified relational database schema.
-* * **Deduplication Validation:** Executed uniqueness checks by running a query pairing **`GROUP BY ride_id`** with a **`HAVING COUNT(*) > 1`** filter across the entire 12-month merged table to confirm zero duplicate primary key entries existed.
-* **Feature Engineering:** * Extracted trip duration metrics in minutes using **`TIMESTAMP_DIFF`** (or **`DATEDIFF`**) between `started_at` and `ended_at` fields.
-  * Formatted temporal attributes using string and date extraction functions (**`EXTRACT`** / **`CASE WHEN`**) to isolate specific months and days of the week.
-* **Data Cleaning & Constraints:** * Enforced **`WHERE`** clause filters to strip data anomalies, including negative trip durations and maintenance test rows.
-  * Screened database integrity using **`IS NOT NULL`** operators to handle missing spatial coordinates and incomplete station rows.
-  * **Handling Missing Spatial Data:** Applied the **`COALESCE`** function to intercept `NULL` values in the start and end station columns, dynamically swapping missing entries with a standard fallback string (`'Unknown'`) to preserve absolute trip volumes while preventing structural breaks in Tableau.
+# 3. Process (Data Cleaning & Wrangle Pipelines)
+To handle a multi-million-row volume inefficient for standard spreadsheet software, data transformation was engineered locally using high-performance DuckDB SQL scripts to ensure rigorous data integrity:
+
+### A. Data Aggregation & Structural Profiling
+* **Table Consolidation:** Utilized **`UNION ALL`** statements to vertically stack and consolidate 12 distinct monthly CSV tables into a unified relational staging table named `Merged_tables`.
+* **Schema Validation:** Executed the **`DESCRIBE`** command to audit structural formatting across all imported data attributes.
+* **Timeline Verification:** Queried **`MIN(started_at)`** and **`MAX(started_at)`** functions to confirm that the consolidated data boundary spanned the exact target 12-month sequence.
+
+### B. Pre-Cleaning Integrity Scans
+* **Anomalous Volume Screening:** Proactively queried the dataset to count missing or invalid zero-valued geographic boundaries (`start_lat = 0`, `end_lng = 0`).
+* **Logical Flow Audit:** Flagged baseline data corruption by running logical comparisons to isolate negative time deltas (`ended_at < started_at`) and excessive outlier trips exceeding a single day (`> INTERVAL '1 day'`).
+
+### C. Data Cleaning, Constraints & Window Deduplication
+* **Coordinate & Time Integrity:** Enforced a multi-conditional **`WHERE`** clause to drop records containing empty or zero coordinates (`IS NOT NULL` and `!= 0`), strip zero-second trips (`ended_at > started_at`), and remove duration outliers exceeding 24 hours (`<= INTERVAL '1 day'`).
+* **Handling Missing Spatial Data:** Applied the **`COALESCE`** function to intercept `NULL` values in the station attributes, dynamically swapping missing records with a default text fallback string (**`'Unknown Station'`**) to preserve total volumetric counts while avoiding breakdown errors in Tableau.
+* **Advanced Window Deduplication:** Instead of a generic filter, primary key uniqueness was strictly enforced during table generation by leveraging an analytical window function: **`QUALIFY ROW_NUMBER() OVER (PARTITION BY ride_id ORDER BY started_at) = 1`** to dynamically preserve only the initial chronological record occurrence per unique ID.
+
+---
 
 ## 4. Analyze (SQL Data Exploration)
-Aggregated metrics were queried using advanced descriptive statistics to extract operational insights:
-* **Descriptive Aggregations:** Applied **`COUNT`**, **`AVG`**, and **`ROUND`** arithmetic functions paired with multi-level **`GROUP BY`** and **`ORDER BY`** clauses to calculate baseline user statistics.
-* **Key Findings:**
-  * **Trip Durations:** Casual riders maintain an average ride length more than double (2x) that of annual members across every single day of the week, indicating leisure-dominant usage patterns.
-  * **Bike Preferences:** Volumetric analysis proved that electric bikes heavily dominate total trip counts across both annual members and casual user segments.
-  * * **Weekly Distribution & Commute Patterns:** 
-  * **Annual Members:** Showcase prominent volume spikes on weekdays (Monday through Friday) specifically during standard peak commuting windows (8:00 AM and 5:00 PM), heavily indicating utility-driven, routine transit usage.
-  * **Casual Riders:** Ridership concentrates heavily on weekends (Saturday and Sunday), with a smooth, continuous volume buildup peaking in the mid-afternoon, pointing toward recreational and leisure use.
+Aggregated metrics were extracted from the production table (`Cleaned_Final_Data`) using advanced analytic queries and window calculations to prepare data structures directly matching dashboard charts:
+
+* **Weekly Distribution Patterns:** Leveraged **`DAYOFWEEK()`** alongside a conditional **`CASE WHEN`** mapping sequence to transform numerical weekday metrics into distinct chronological labels (`0` as `'Sunday'` through `6` as `'Saturday'`).
+* **Global Cohort Calculations:** Applied an unpartitioned window aggregate **`SUM(COUNT(*)) OVER ()`** to mathematically divide user segment frequencies by the total row-count matrix, returning the precise percentage share of total rides.
+* **Hourly Trend Visual Preparation:** Extracted explicit time integers using **`EXTRACT(HOUR FROM started_at)`** to group overall trip patterns into historical 24-hour operational profiles.
+* **Fleet Segmentation Mixes:** Deployed partitioned window functions (**`SUM(COUNT(*)) OVER(PARTITION BY member_casual)`**) to discover internal hardware usage choices (Classic vs. Electric) independently isolated inside each distinct rider archetype.
+* **Refined Ride-Length Metrics:** Designed a Common Table Expression (**`WITH computed_rides AS...`**) to extract precise decimal minute intervals via **`DATE_DIFF('second', started_at, ended_at) / 60.0`**, calculating exact averages across stabilized data windows (between 1.0 and 1440.0 minutes).
 
 ## 5. Share (High-Fidelity Visualization)
 Insights were compiled into 3-page Tableau dashboard:
